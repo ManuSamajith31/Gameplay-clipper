@@ -64,7 +64,16 @@ CAPTION_STYLE = (
 def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
     """Run a command, print it, and fail loudly unless check=False."""
     print(f"$ {' '.join(cmd)}")
-    return subprocess.run(cmd, check=check)
+    result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+    if check and result.returncode != 0:
+        tail = "\n".join(result.stderr.strip().splitlines()[-5:])
+        raise RuntimeError(
+            f"Command failed (exit {result.returncode}): {' '.join(cmd)}\n{tail}")
+    return result
 
 
 def parse_time(value: str) -> float:
@@ -201,7 +210,8 @@ def build_filter(width: int, height: int, mode: str, srt: Path | None) -> str:
         )
     if srt is not None:
 
-        srt_escaped = str(srt).replace(":", "\\:").replace("'", "\\'")
+        srt_escaped = (str(srt).replace("\\", "/").replace(":", "\\:")
+                       .replace("'", "\\'"))
         vf += f",subtitles='{srt_escaped}':force_style='{CAPTION_STYLE}'"
     return vf
 
