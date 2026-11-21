@@ -53,10 +53,12 @@ PRESETS = {
     "landscape": (1920, 1080),
 }
 
-CAPTION_STYLE = (
-    "FontSize=30,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,"
-    "BorderStyle=1,Outline=2,Shadow=0,Bold=1,Alignment=2,MarginV=140"
-)
+def caption_style(font: str = "Verdana") -> str:
+    return (
+        f"FontName={font},FontSize=22,PrimaryColour=&HFFFFFF,"
+        "OutlineColour=&H000000,BorderStyle=1,Outline=2,Shadow=0,"
+        "Bold=1,Alignment=2,MarginV=60"
+    )
 
 
 
@@ -223,7 +225,8 @@ def fmt_srt_time(seconds: float) -> str:
 
 
 
-def build_filter(width: int, height: int, mode: str, srt: Path | None) -> str:
+def build_filter(width: int, height: int, mode: str, srt: Path | None,
+                 font: str = "Verdana") -> str:
     """Video filter chain: vertical resize, then caption burn-in."""
     if (width, height) == (1920, 1080):
 
@@ -244,13 +247,14 @@ def build_filter(width: int, height: int, mode: str, srt: Path | None) -> str:
 
         srt_escaped = (str(srt).replace("\\", "/").replace(":", "\\:")
                        .replace("'", "\\'"))
-        vf += f",subtitles='{srt_escaped}':force_style='{CAPTION_STYLE}'"
+        vf += f",subtitles='{srt_escaped}':force_style='{caption_style(font)}'"
     return vf
 
 
 def export_clip(source: Path, start: float, end: float, out: Path,
-                width: int, height: int, mode: str, srt: Path | None) -> None:
-    vf = build_filter(width, height, mode, srt)
+                width: int, height: int, mode: str, srt: Path | None,
+                font: str = "Verdana") -> None:
+    vf = build_filter(width, height, mode, srt, font)
     cmd = [
         "ffmpeg", "-y",
         "-ss", str(start), "-to", str(end),
@@ -298,8 +302,8 @@ def main() -> None:
     ap.add_argument("--out", required=True, help="output file, e.g. clip.mp4")
     ap.add_argument("--highlights", default=0, type=int,
                     help="auto-pick this many best moments instead of --start/--end")
-    ap.add_argument("--highlight-length", default=15.0, type=float,
-                    help="length of each auto highlight in seconds (default: 15)")
+    ap.add_argument("--highlight-length", default=60.0, type=float,
+                    help="length of each auto highlight in seconds (default: 60)")
     ap.add_argument("--platform", default="tiktok", choices=sorted(PRESETS),
                     help="preset size (default: tiktok = 1080x1920)")
     ap.add_argument("--format", default=None,
@@ -311,6 +315,8 @@ def main() -> None:
                     help="skip auto-captions")
     ap.add_argument("--model", default="tiny",
                     help="Whisper model: tiny, base, small (bigger = better, slower)")
+    ap.add_argument("--font", default="Verdana",
+                    help="caption font, e.g. Verdana, Arial, Impact (default: Verdana)")
     ap.add_argument("--music", default=None,
                     help="background music file (mp3/wav), mixed under the game audio")
     ap.add_argument("--music-volume", default=0.15, type=float,
@@ -359,7 +365,8 @@ def main() -> None:
                 srt = transcribe_to_srt(source, start, end, args.model, workdir)
             out = out_path if len(jobs) == 1 else out_path.with_stem(
                 f"{out_path.stem}_{i + 1}")
-            export_clip(source, start, end, out, width, height, args.mode, srt)
+            export_clip(source, start, end, out, width, height, args.mode, srt,
+                        args.font)
             if args.music:
                 mix_music(out, args.music, args.music_volume, out)
 
