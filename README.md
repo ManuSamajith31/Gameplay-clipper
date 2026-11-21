@@ -25,6 +25,12 @@ to YouTube Shorts, TikTok, Instagram Reels and Facebook.
 5. **Best moments** — `--highlights 3` skips picking times by hand: it
    finds the loudest moments in the video (gunfights, explosions,
    reactions) and exports the top 3 as separate clips.
+6. **Sharper export** — `--upscale 2` exports at twice the size (2160x3840
+   vertical), so a 1080p recording keeps its detail instead of being shrunk
+   down. Resizing uses high-quality lanczos scaling and sharper encoding
+   (CRF 18), so clips look crisper on phones. Bigger files and a slower
+   export — untick it in the app (or leave `--upscale` off) for the
+   standard size.
 
 Input can be a local recording, or a YouTube URL — use your own uploads
 (or videos you have the rights to), not other people's content.
@@ -59,7 +65,8 @@ Paste a YouTube link, or drag a video file onto the window (or use
 Browse). Pick the start / end (1 minute by default), platform, blur or
 crop, and hit "Make clip". You can also pick a background music file (with a volume
 slider), choose the caption font, or tick "Auto-pick best moments" and let it find the loudest
-moments for you. While a clip is being made, a little robot edits it for
+moments for you. Tick "Sharper export (upscale ×2)" (on by default) for a
+crisper 2160x3840 clip. While a clip is being made, a little robot edits it for
 you — bobbing, blinking and snipping the film strip — next to a progress
 bar. The File menu (Ctrl+O to open a video) and the status bar at the
 bottom make it feel like a proper app. Drag & drop needs one extra package:
@@ -95,6 +102,9 @@ python clip.py "https://www.youtube.com/watch?v=XXXX" --start 60 --end 90 --out 
 # Mix background music under the game audio (music at 20% volume)
 python clip.py gameplay.mp4 --start 60 --end 90 --music my_track.mp3 --music-volume 0.2 --out clip.mp4
 
+# Sharper export: upscale x2 (2160x3840 vertical) for crisper clips
+python clip.py gameplay.mp4 --start 60 --end 90 --upscale 2 --out clip.mp4
+
 # Auto-pick the 3 best moments, 15 seconds each, no times needed
 python clip.py gameplay.mp4 --highlights 3 --out best.mp4
 # -> best_1.mp4, best_2.mp4, best_3.mp4
@@ -117,6 +127,7 @@ python clip.py gameplay.mp4 --highlights 3 --highlight-length 10 --music my_trac
 | `--highlights` | Auto-pick this many best moments instead of `--start`/`--end` |
 | `--highlight-length` | Length of each auto highlight in seconds (default 60) |
 | `--font` | Caption font, e.g. Verdana, Arial, Impact (default Verdana) |
+| `--upscale` | Export at N times the preset size, e.g. `2` = 2160x3840 vertical (sharper, bigger file, slower) |
 
 Captions are small white bold text with a black outline, centred at the
 bottom of the frame — the usual short-form look. The `.srt` file is kept in a temp folder; if you want
