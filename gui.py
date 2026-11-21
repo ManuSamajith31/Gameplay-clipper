@@ -19,7 +19,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-APP_VERSION = "1.1"
+APP_VERSION = "1.2"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -272,6 +272,13 @@ class ClipperApp:
         ttk.Button(out_row, text="Browse…",
                    command=self._browse_out).pack(side=tk.LEFT)
 
+        quality_row = ttk.Frame(save_frame)
+        quality_row.pack(fill=tk.X, pady=(8, 0))
+        self.upscale_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(quality_row,
+                        text="Sharper export (upscale ×2)",
+                        variable=self.upscale_var).pack(side=tk.LEFT)
+
         work_row = ttk.Frame(save_frame)
         work_row.pack(fill=tk.X, pady=(10, 0))
         self.robot_canvas = tk.Canvas(work_row, width=140, height=110,
@@ -480,15 +487,20 @@ class ClipperApp:
             args=(source, start, end, self.platform_var.get(),
                   self.mode_var.get(), self.captions_var.get(),
                   self.model_var.get(), out, music, music_volume,
-                  highlights, highlight_len, self.font_var.get()),
+                  highlights, highlight_len, self.font_var.get(),
+                  self.upscale_var.get()),
             daemon=True).start()
 
     def _run(self, source: str, start: float, end: float, platform: str,
              mode: str, captions: bool, model: str, out: str,
              music: str | None, music_volume: float,
-             highlights: int, highlight_len: float, font: str) -> None:
+             highlights: int, highlight_len: float, font: str,
+             upscale: bool) -> None:
         try:
             width, height = PRESETS[platform]
+            if upscale:
+                width *= 2
+                height *= 2
             with tempfile.TemporaryDirectory(prefix="clipper-") as tmp:
                 workdir = Path(tmp)
                 local = fetch_source(source, workdir)
