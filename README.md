@@ -36,6 +36,25 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+## GUI (no terminal)
+
+Prefer buttons to commands? Run the simple window:
+
+```bash
+python gui.py
+```
+
+Paste a YouTube link, or drag a video file onto the window (or use
+Browse). Pick the start / end, platform, blur or crop, and hit
+"Make clip". Drag & drop needs one extra package:
+
+```bash
+pip install tkinterdnd2
+```
+
+Without it, the window still works — just use Browse instead of
+dragging.
+
 ## Usage
 
 ```bash
