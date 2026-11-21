@@ -39,16 +39,16 @@ import sys
 import tempfile
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Platform presets: name -> (width, height)
-# ---------------------------------------------------------------------------
+
+
+
 PRESETS = {
-    "shorts": (1080, 1920),    # YouTube Shorts
-    "tiktok": (1080, 1920),    # TikTok
-    "reels": (1080, 1920),     # Instagram Reels
-    "facebook": (1080, 1920),  # Facebook Reels / short video
-    "square": (1080, 1080),    # 1:1 feed posts
-    "landscape": (1920, 1080), # 16:9, keep it wide
+    "shorts": (1080, 1920),
+    "tiktok": (1080, 1920),
+    "reels": (1080, 1920),
+    "facebook": (1080, 1920),
+    "square": (1080, 1080),
+    "landscape": (1920, 1080),
 }
 
 CAPTION_STYLE = (
@@ -57,9 +57,9 @@ CAPTION_STYLE = (
 )
 
 
-# ---------------------------------------------------------------------------
-# Small helpers
-# ---------------------------------------------------------------------------
+
+
+
 def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
     """Run a command, print it, and fail loudly unless check=False."""
     print(f"$ {' '.join(cmd)}")
@@ -101,9 +101,9 @@ def probe_size(path: str) -> tuple[int, int]:
     return int(w), int(h)
 
 
-# ---------------------------------------------------------------------------
-# Step 1 — get the source video (local file, or download your own YouTube video)
-# ---------------------------------------------------------------------------
+
+
+
 def fetch_source(source: str, workdir: Path) -> Path:
     if os.path.isfile(source):
         return Path(source)
@@ -120,9 +120,9 @@ def fetch_source(source: str, workdir: Path) -> Path:
     sys.exit(f"Can't find file or URL: {source}")
 
 
-# ---------------------------------------------------------------------------
-# Step 2 — auto-captions with Whisper (offline, free)
-# ---------------------------------------------------------------------------
+
+
+
 def transcribe_to_srt(video: Path, start: float, end: float,
                       model: str, workdir: Path) -> Path | None:
     """Transcribe the clipped audio and write an .srt file. None if no speech."""
@@ -139,9 +139,9 @@ def transcribe_to_srt(video: Path, start: float, end: float,
 
     print(f"Transcribing with Whisper model {model!r} (first run downloads it)…")
     whisper = WhisperModel(model, device="cpu", compute_type="int8")
-    # Pass raw PCM as a numpy array instead of a file path: faster-whisper
-    # decodes file paths with av.open(..., metadata_errors=...), which newer
-    # PyAV versions removed — the array path skips that entirely.
+
+
+
     import numpy as np
     pcm = subprocess.run(
         ["ffmpeg", "-y", "-v", "error", "-i", str(audio),
@@ -176,19 +176,19 @@ def fmt_srt_time(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
-# ---------------------------------------------------------------------------
-# Step 3 — trim, resize, burn captions, export
-# ---------------------------------------------------------------------------
+
+
+
 def build_filter(width: int, height: int, mode: str, srt: Path | None) -> str:
     """Video filter chain: vertical resize, then caption burn-in."""
     if (width, height) == (1920, 1080):
-        # Landscape: keep the frame as-is, just make sure it's 1080p.
+
         vf = f"scale={width}:{height}:force_original_aspect_ratio=decrease," \
              f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"
     elif mode == "crop":
         vf = (f"scale={width}:{height}:force_original_aspect_ratio=increase,"
               f"crop={width}:{height}")
-    else:  # blur: full gameplay visible, blurred copy fills the sides
+    else:
         vf = (
             f"split[a][b];"
             f"[a]scale={width}:{height}:force_original_aspect_ratio=increase,"
@@ -197,7 +197,7 @@ def build_filter(width: int, height: int, mode: str, srt: Path | None) -> str:
             f"[bg][fg]overlay=(W-w)/2:(H-h)/2"
         )
     if srt is not None:
-        # Escape the path for the subtitles filter.
+
         srt_escaped = str(srt).replace(":", "\\:").replace("'", "\\'")
         vf += f",subtitles='{srt_escaped}':force_style='{CAPTION_STYLE}'"
     return vf
@@ -221,9 +221,9 @@ def export_clip(source: Path, start: float, end: float, out: Path,
     print(f"\nDone -> {out}  ({width}x{height}, {end - start:.0f}s)")
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
+
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description="Clip gameplay into a captioned vertical short.")
