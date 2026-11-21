@@ -19,6 +19,9 @@ Examples
   # Clip 30 seconds of a local recording, captions on, vertical for TikTok
   python clip.py gameplay.mp4 --start 83 --end 113 --out clip.mp4
 
+  # Sharper export: upscale the finished clip x2 (2160x3840 vertical)
+  python clip.py gameplay.mp4 --start 83 --end 113 --upscale 2 --out clip.mp4
+
   # Same, but crop to fill the frame instead of blurred sides
   python clip.py gameplay.mp4 --start 1:23 --end 1:53 --mode crop --out clip.mp4
 
@@ -228,19 +231,19 @@ def fmt_srt_time(seconds: float) -> str:
 def build_filter(width: int, height: int, mode: str, srt: Path | None,
                  font: str = "Verdana") -> str:
     """Video filter chain: vertical resize, then caption burn-in."""
-    if (width, height) == (1920, 1080):
+    if width * 9 == height * 16:
 
-        vf = f"scale={width}:{height}:force_original_aspect_ratio=decrease," \
+        vf = f"scale={width}:{height}:force_original_aspect_ratio=decrease:flags=lanczos," \
              f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"
     elif mode == "crop":
-        vf = (f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+        vf = (f"scale={width}:{height}:force_original_aspect_ratio=increase:flags=lanczos,"
               f"crop={width}:{height}")
     else:
         vf = (
             f"split[a][b];"
-            f"[a]scale={width}:{height}:force_original_aspect_ratio=increase,"
+            f"[a]scale={width}:{height}:force_original_aspect_ratio=increase:flags=lanczos,"
             f"crop={width}:{height},gblur=sigma=40[bg];"
-            f"[b]scale={width}:{height}:force_original_aspect_ratio=decrease[fg];"
+            f"[b]scale={width}:{height}:force_original_aspect_ratio=decrease:flags=lanczos[fg];"
             f"[bg][fg]overlay=(W-w)/2:(H-h)/2"
         )
     if srt is not None:
@@ -260,7 +263,7 @@ def export_clip(source: Path, start: float, end: float, out: Path,
         "-ss", str(start), "-to", str(end),
         "-i", str(source),
         "-vf", vf,
-        "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "18",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "160k",
         "-movflags", "+faststart",
@@ -308,6 +311,9 @@ def main() -> None:
                     help="preset size (default: tiktok = 1080x1920)")
     ap.add_argument("--format", default=None,
                     help="override size: 9:16, 1:1 or 16:9")
+    ap.add_argument("--upscale", default=1, type=int,
+                    help="export at N times the preset size, e.g. 2 = 2160x3840 "
+                         "vertical (sharper, bigger file)")
     ap.add_argument("--mode", default="blur", choices=["blur", "crop"],
                     help="blur: keep full frame with blurred sides (default); "
                          "crop: fill the frame, edges cut off")
@@ -341,6 +347,10 @@ def main() -> None:
         width, height = {"9:16": (1080, 1920), "1:1": (1080, 1080),
                          "16:9": (1920, 1080)}.get(fmt) or ap.error(
             "--format must be 9:16, 1:1 or 16:9")
+    if args.upscale < 1:
+        ap.error("--upscale must be 1 or more")
+    width *= args.upscale
+    height *= args.upscale
 
     with tempfile.TemporaryDirectory(prefix="clipper-") as tmp:
         workdir = Path(tmp)
