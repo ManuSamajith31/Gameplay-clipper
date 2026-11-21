@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -110,7 +111,9 @@ def fetch_source(source: str, workdir: Path) -> Path:
     if source.startswith(("http://", "https://")):
         print("Downloading video with yt-dlp (use your own uploads only)…")
         target = workdir / "source.%(ext)s"
-        run(["yt-dlp", "-f", "bv*[height<=1080]+ba/b[height<=1080]",
+        ytdlp = shutil.which("yt-dlp") or str(
+            Path(sys.executable).parent / "yt-dlp")
+        run([ytdlp, "-f", "bv*[height<=1080]+ba/b[height<=1080]",
              "--merge-output-format", "mp4",
              "-o", str(target), source])
         files = sorted(workdir.glob("source.*"))
