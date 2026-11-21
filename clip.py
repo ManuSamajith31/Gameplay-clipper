@@ -55,9 +55,9 @@ PRESETS = {
 
 def caption_style(font: str = "Verdana") -> str:
     return (
-        f"FontName={font},FontSize=22,PrimaryColour=&HFFFFFF,"
+        f"FontName={font},FontSize=18,PrimaryColour=&HFFFFFF,"
         "OutlineColour=&H000000,BorderStyle=1,Outline=2,Shadow=0,"
-        "Bold=1,Alignment=2,MarginV=60"
+        "Bold=1,Alignment=2,MarginV=30"
     )
 
 
