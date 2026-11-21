@@ -1,5 +1,8 @@
 # Gameplay Clipper
 
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+![License: MIT](https://img.shields.io/badge/License-MIT-green)
+
 Turn your gameplay recordings into captioned vertical clips, ready to upload
 to YouTube Shorts, TikTok, Instagram Reels and Facebook.
 
