@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -112,6 +113,37 @@ def probe_size(path: str) -> tuple[int, int]:
 
 
 
+
+
+def window_loudness(video: str, start: float, length: float) -> float:
+    result = subprocess.run(
+        ["ffmpeg", "-ss", str(start), "-t", str(length),
+         "-i", video, "-vn", "-af", "volumedetect", "-f", "null", "-"],
+        capture_output=True, text=True, check=False,
+    )
+    match = re.search(r"mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB", result.stderr)
+    return float(match.group(1)) if match else -91.0
+
+
+def find_highlights(video: str, window: float = 5.0,
+                    clip_len: float = 15.0, count: int = 3) -> list[float]:
+    duration = probe_duration(video)
+    scored: list[tuple[float, float]] = []
+    start = 0.0
+    while start < duration:
+        scored.append((window_loudness(
+            video, start, min(window, duration - start)), start))
+        start += window
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    picked: list[float] = []
+    for _, moment in scored:
+        clip_start = max(0.0, moment + window / 2 - clip_len / 2)
+        clip_start = min(clip_start, max(0.0, duration - clip_len))
+        if all(abs(clip_start - other) >= clip_len for other in picked):
+            picked.append(clip_start)
+        if len(picked) == count:
+            break
+    return sorted(picked)
 
 
 def fetch_source(source: str, workdir: Path) -> Path:
@@ -234,6 +266,24 @@ def export_clip(source: Path, start: float, end: float, out: Path,
     print(f"\nDone -> {out}  ({width}x{height}, {end - start:.0f}s)")
 
 
+def mix_music(clip: Path, music: str, volume: float, out: Path) -> None:
+    tmp = out.with_suffix(".music.mp4")
+    run([
+        "ffmpeg", "-y",
+        "-i", str(clip),
+        "-stream_loop", "-1", "-i", music,
+        "-filter_complex",
+        f"[0:a]volume=1[a0];[1:a]volume={volume}[a1];"
+        "[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[aout]",
+        "-map", "0:v", "-map", "[aout]",
+        "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
+        "-movflags", "+faststart",
+        str(tmp),
+    ])
+    tmp.replace(out)
+    print(f"Music mixed in -> {out} (music at {volume:.0%})")
+
+
 
 
 
@@ -241,11 +291,15 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description="Clip gameplay into a captioned vertical short.")
     ap.add_argument("source", help="local video file, or a YouTube URL (your own video)")
-    ap.add_argument("--start", required=True, type=parse_time,
+    ap.add_argument("--start", default=None, type=parse_time,
                     help="clip start — seconds (83) or mm:ss (1:23)")
-    ap.add_argument("--end", required=True, type=parse_time,
+    ap.add_argument("--end", default=None, type=parse_time,
                     help="clip end — seconds or mm:ss")
     ap.add_argument("--out", required=True, help="output file, e.g. clip.mp4")
+    ap.add_argument("--highlights", default=0, type=int,
+                    help="auto-pick this many best moments instead of --start/--end")
+    ap.add_argument("--highlight-length", default=15.0, type=float,
+                    help="length of each auto highlight in seconds (default: 15)")
     ap.add_argument("--platform", default="tiktok", choices=sorted(PRESETS),
                     help="preset size (default: tiktok = 1080x1920)")
     ap.add_argument("--format", default=None,
@@ -257,13 +311,23 @@ def main() -> None:
                     help="skip auto-captions")
     ap.add_argument("--model", default="tiny",
                     help="Whisper model: tiny, base, small (bigger = better, slower)")
+    ap.add_argument("--music", default=None,
+                    help="background music file (mp3/wav), mixed under the game audio")
+    ap.add_argument("--music-volume", default=0.15, type=float,
+                    help="background music volume, 0.0-1.0 (default: 0.15)")
     args = ap.parse_args()
 
-    if args.end <= args.start:
-        ap.error("--end must be after --start")
-    if args.end - args.start > 180:
-        print("! Clip is over 3 minutes — Shorts/TikTok/Reels cap at 3 min. "
-              "It'll still export, but check the platform limit.")
+    if args.highlights:
+        clip_len = args.highlight_length
+    else:
+        if args.start is None or args.end is None:
+            ap.error("--start and --end are required unless --highlights is set")
+        if args.end <= args.start:
+            ap.error("--end must be after --start")
+        if args.end - args.start > 180:
+            print("! Clip is over 3 minutes — Shorts/TikTok/Reels cap at 3 min. "
+                  "It'll still export, but check the platform limit.")
+        clip_len = args.end - args.start
 
     width, height = PRESETS[args.platform]
     if args.format:
@@ -276,16 +340,28 @@ def main() -> None:
         workdir = Path(tmp)
         source = fetch_source(args.source, workdir)
         duration = probe_duration(str(source))
-        if args.end > duration:
-            print(f"! Video is only {duration:.0f}s long — trimming --end to {duration:.0f}s.")
-            args.end = duration
+        if args.highlights:
+            starts = find_highlights(str(source), count=args.highlights,
+                                     clip_len=clip_len)
+            print(f"Best moments: {[f'{s:.0f}s' for s in starts]}")
+            jobs = [(s, min(s + clip_len, duration)) for s in starts]
+        else:
+            end = args.end
+            if end > duration:
+                print(f"! Video is only {duration:.0f}s long — trimming --end to {duration:.0f}s.")
+                end = duration
+            jobs = [(args.start, end)]
 
-        srt = None
-        if not args.no_captions:
-            srt = transcribe_to_srt(source, args.start, args.end, args.model, workdir)
-
-        export_clip(source, args.start, args.end, Path(args.out),
-                    width, height, args.mode, srt)
+        out_path = Path(args.out)
+        for i, (start, end) in enumerate(jobs):
+            srt = None
+            if not args.no_captions:
+                srt = transcribe_to_srt(source, start, end, args.model, workdir)
+            out = out_path if len(jobs) == 1 else out_path.with_stem(
+                f"{out_path.stem}_{i + 1}")
+            export_clip(source, start, end, out, width, height, args.mode, srt)
+            if args.music:
+                mix_music(out, args.music, args.music_volume, out)
 
 
 if __name__ == "__main__":
