@@ -7,7 +7,8 @@ to YouTube Shorts, TikTok, Instagram Reels and Facebook.
 
 1. **Clip** — cut any moment out of a recording (`--start` / `--end`).
 2. **Auto-caption** — transcribes the audio with Whisper (free, offline) and
-   burns bold short-form captions into the video.
+   burns small bold captions into the bottom of the video (Verdana by
+   default; change it with `--font`, e.g. Arial, Impact).
 3. **Resize** — exports vertical 9:16 (1080x1920) by default, so it fits
    Shorts / TikTok / Reels without black bars. Two ways to fill the frame:
    - `blur` (default): the full gameplay stays visible, with a blurred copy
@@ -52,10 +53,11 @@ python gui.py
 ```
 
 Paste a YouTube link, or drag a video file onto the window (or use
-Browse). Pick the start / end, platform, blur or crop, and hit
-"Make clip". You can also pick a background music file (with a volume
-slider), or tick "Auto-pick best moments" and let it find the loudest
-moments for you. Drag & drop needs one extra package:
+Browse). Pick the start / end (1 minute by default), platform, blur or
+crop, and hit "Make clip". You can also pick a background music file (with a volume
+slider), choose the caption font, or tick "Auto-pick best moments" and let it find the loudest
+moments for you. While a clip is being made, a spinner and progress bar
+show it working. Drag & drop needs one extra package:
 
 ```bash
 pip install tkinterdnd2
@@ -108,10 +110,11 @@ python clip.py gameplay.mp4 --highlights 3 --highlight-length 10 --music my_trac
 | `--music` | Background music file (mp3/wav), mixed under the game audio |
 | `--music-volume` | Music volume 0.0–1.0 (default 0.15) |
 | `--highlights` | Auto-pick this many best moments instead of `--start`/`--end` |
-| `--highlight-length` | Length of each auto highlight in seconds (default 15) |
+| `--highlight-length` | Length of each auto highlight in seconds (default 60) |
+| `--font` | Caption font, e.g. Verdana, Arial, Impact (default Verdana) |
 
-Captions are white bold text with a black outline, bottom-centre — the
-usual short-form look. The `.srt` file is kept in a temp folder; if you want
+Captions are small white bold text with a black outline, at the bottom
+of the frame — the usual short-form look. The `.srt` file is kept in a temp folder; if you want
 to edit captions by hand, run with `--model` once, grab the SRT, edit it,
 and a future `--srt` option will burn your edited version in.
 
