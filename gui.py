@@ -10,6 +10,7 @@ Browse button still works.
 """
 
 import os
+import math
 import queue
 import sys
 import tempfile
@@ -17,6 +18,8 @@ import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
+
+APP_VERSION = "1.1"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -67,20 +70,25 @@ def split_drop_data(data: str) -> list[str]:
 
 
 class ClipperApp:
-    SPIN_FRAMES = "|/-\\"
-
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("Gameplay Clipper")
-        self.root.geometry("600x780")
-        self.root.minsize(520, 640)
+        self.root.geometry("620x880")
+        self.root.minsize(540, 720)
         self.log_queue: queue.Queue[str] = queue.Queue()
         self.result_queue: queue.Queue[tuple[bool, str]] = queue.Queue()
         self.running = False
         self.source_file: str | None = None
-        self._spin = 0
+        self._dots = 0
+        self._anim = 0
+        self._bob_prev = 0
+        self._pupil_prev = 0
+        self._film_dx = 0
+        self._blinking = False
         self._style()
+        self._build_menu()
         self._build()
+        self._draw_robot()
         self._poll_log()
 
     def _style(self) -> None:
@@ -102,14 +110,49 @@ class ClipperApp:
         style.configure("Drop.TLabel", background="#eaf6ee",
                         foreground="#1d3557", font=("", 11))
 
+    def _build_menu(self) -> None:
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label="Open video…", accelerator="Ctrl+O",
+                              command=self._browse_file)
+        file_menu.add_command(label="Save clip as…",
+                              command=self._browse_out)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.root.destroy)
+        menubar.add_cascade(label="File", menu=file_menu)
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="About Gameplay Clipper…",
+                              command=self._about)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        self.root.bind_all("<Control-o>", lambda _e: self._browse_file())
+
+    def _about(self) -> None:
+        messagebox.showinfo(
+            "About Gameplay Clipper",
+            f"Gameplay Clipper {APP_VERSION}\n\n"
+            "Turn gameplay into Shorts, TikTok & Reels.\n"
+            "Clip, auto-caption, add music and pick the best\n"
+            "moments — in one click.")
+
     def _build(self) -> None:
+        statusbar = ttk.Frame(self.root, relief="sunken", padding=(6, 2))
+        statusbar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.statusbar_left = ttk.Label(statusbar, text="Ready")
+        self.statusbar_left.pack(side=tk.LEFT)
+        ttk.Label(statusbar,
+                  text=f"Gameplay Clipper {APP_VERSION}").pack(side=tk.RIGHT)
+
         main = ttk.Frame(self.root, padding=12)
         main.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(main, text="Gameplay Clipper",
-                  style="Title.TLabel").pack(anchor="w")
-        ttk.Label(main, text="Turn gameplay into Shorts, TikTok & Reels — in one click.",
-                  style="Sub.TLabel").pack(anchor="w", pady=(0, 8))
+        banner = tk.Frame(main, bg="#1d3557")
+        banner.pack(fill=tk.X, pady=(0, 10))
+        tk.Label(banner, text="Gameplay Clipper", font=("", 18, "bold"),
+                 fg="white", bg="#1d3557").pack(side=tk.LEFT, padx=12, pady=8)
+        tk.Label(banner, text="Shorts · TikTok · Reels", font=("", 10),
+                 fg="#b8c7d9", bg="#1d3557").pack(side=tk.LEFT, padx=(4, 0),
+                                                 pady=(14, 8))
 
         video_frame = ttk.LabelFrame(main, text="1 · Video", padding=8)
         video_frame.pack(fill=tk.X, pady=(0, 8))
@@ -229,17 +272,82 @@ class ClipperApp:
         ttk.Button(out_row, text="Browse…",
                    command=self._browse_out).pack(side=tk.LEFT)
 
-        self.run_button = ttk.Button(save_frame, text="✦  Make clip",
+        work_row = ttk.Frame(save_frame)
+        work_row.pack(fill=tk.X, pady=(10, 0))
+        self.robot_canvas = tk.Canvas(work_row, width=140, height=110,
+                                      bg="#f7f7f7", highlightthickness=0)
+        self.robot_canvas.pack(side=tk.LEFT)
+        right = ttk.Frame(work_row)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
+
+        self.run_button = ttk.Button(right, text="✦  Make clip",
                                      style="Accent.TButton",
                                      command=self._start_run)
-        self.run_button.pack(fill=tk.X, pady=(10, 4))
-        self.progress = ttk.Progressbar(save_frame, mode="indeterminate")
-        self.progress.pack(fill=tk.X, pady=(0, 4))
-        self.status_label = ttk.Label(save_frame, text="Ready")
-        self.status_label.pack(anchor="w")
+        self.run_button.pack(fill=tk.X)
+        self.progress = ttk.Progressbar(right, mode="indeterminate")
+        self.progress.pack(fill=tk.X, pady=(8, 0))
+        self.status_label = ttk.Label(right, text="Ready")
+        self.status_label.pack(anchor="w", pady=(6, 0))
 
-        self.log = tk.Text(main, height=10, state=tk.DISABLED, wrap=tk.WORD)
-        self.log.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
+        ttk.Label(main, text="Activity", font=("", 10, "bold")).pack(
+            anchor="w", pady=(8, 0))
+        self.log = tk.Text(main, height=8, state=tk.DISABLED, wrap=tk.WORD)
+        self.log.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
+
+    def _draw_robot(self, frame: int = 0) -> None:
+        canvas = self.robot_canvas
+        canvas.delete("all")
+        green = "#2ea36b"
+        dark = "#1e7a4c"
+        bob = [0, -2, -3, -2, 0, 2, 3, 2][frame % 8]
+        pupil_dx = [0, 2, 0, -2][frame % 4]
+        blink = frame % 28 in (0, 1)
+        ball = "#ffd166" if (frame // 8) % 2 else "#f4a259"
+
+        film_dx = -(frame * 2 % 12)
+        canvas.create_rectangle(-12 + film_dx, 92, 152 + film_dx, 104,
+                                fill="#333333", outline="")
+        for x in range(-12, 152, 12):
+            canvas.create_rectangle(x + 4 + film_dx, 96, x + 8 + film_dx, 100,
+                                    fill="white", outline="")
+
+        canvas.create_line(70, 22 + bob, 70, 12 + bob, width=2, fill=dark)
+        canvas.create_oval(66, 5 + bob, 74, 13 + bob, fill=ball, outline="")
+        canvas.create_oval(48, 22 + bob, 92, 56 + bob, fill=green,
+                           outline=dark, width=2)
+        if blink:
+            canvas.create_line(57, 37 + bob, 67, 37 + bob, width=2,
+                               fill="#1d3557")
+            canvas.create_line(73, 37 + bob, 83, 37 + bob, width=2,
+                               fill="#1d3557")
+        else:
+            canvas.create_oval(57, 32 + bob, 67, 42 + bob, fill="white",
+                               outline="")
+            canvas.create_oval(73, 32 + bob, 83, 42 + bob, fill="white",
+                               outline="")
+            canvas.create_oval(60 + pupil_dx, 35 + bob, 66 + pupil_dx,
+                               41 + bob, fill="#1d3557", outline="")
+            canvas.create_oval(76 + pupil_dx, 35 + bob, 82 + pupil_dx,
+                               41 + bob, fill="#1d3557", outline="")
+        canvas.create_arc(60, 42 + bob, 80, 54 + bob, start=200, extent=140,
+                          style=tk.ARC, outline="#1d3557", width=2)
+        canvas.create_rectangle(52, 56 + bob, 88, 82 + bob, fill=green,
+                                outline=dark, width=2)
+        canvas.create_rectangle(62, 63 + bob, 78, 73 + bob, fill="#d8f3e3",
+                                outline="")
+        canvas.create_line(52, 62 + bob, 40, 70 + bob, width=3, fill=dark)
+        canvas.create_line(88, 62 + bob, 100, 70 + bob, width=3, fill=dark)
+        canvas.create_oval(37, 67 + bob, 43, 73 + bob, fill=green,
+                           outline=dark)
+        pivot = (104, 70 + bob)
+        angle = 12 if (frame // 2) % 2 == 0 else -12
+        for base in (45, -45):
+            rad = math.radians(base + angle * (1 if base > 0 else -1))
+            dx = 8 * math.cos(rad)
+            dy = 8 * math.sin(rad)
+            canvas.create_line(pivot[0] - dx, pivot[1] - dy,
+                               pivot[0] + dx, pivot[1] + dy, width=2,
+                               fill="#5a6b7a")
 
     def _on_drop(self, event) -> None:  # type: ignore[no-untyped-def]
         paths = split_drop_data(event.data)
@@ -257,6 +365,7 @@ class ClipperApp:
     def _set_file(self, path: str) -> None:
         self.source_file = path
         self.file_label.config(text=Path(path).name)
+        self.statusbar_left.config(text=f"Source: {Path(path).name}")
         self.url_entry.delete(0, tk.END)
 
     def _browse_music(self) -> None:
@@ -301,10 +410,11 @@ class ClipperApp:
         except queue.Empty:
             pass
         if self.running:
-            self._spin = (self._spin + 1) % len(self.SPIN_FRAMES)
-            dots = "." * (self._spin % 4)
+            self._dots = (self._dots + 1) % 4
             self.status_label.config(
-                text=f"{self.SPIN_FRAMES[self._spin]} Making your clip{dots}")
+                text=f"Robot is editing your clip{'.' * self._dots}")
+            self._anim += 1
+            self._draw_robot(self._anim)
         self.root.after(100, self._poll_log)
 
     def _start_run(self) -> None:
@@ -362,7 +472,8 @@ class ClipperApp:
         self.running = True
         self.run_button.config(state=tk.DISABLED)
         self.progress.start(12)
-        self.status_label.config(text="Making your clip…")
+        self.status_label.config(text="Robot is editing your clip…")
+        self.statusbar_left.config(text="Working…")
         self._log(f"Source: {source}")
         threading.Thread(
             target=self._run,
@@ -432,8 +543,10 @@ class ClipperApp:
     def _finish(self, ok: bool, message: str) -> None:
         self.running = False
         self.progress.stop()
+        self._draw_robot(0)
         self.run_button.config(state=tk.NORMAL)
         self.status_label.config(text=message)
+        self.statusbar_left.config(text=message)
         if ok:
             messagebox.showinfo("Done", message)
         else:
