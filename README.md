@@ -7,7 +7,7 @@ to YouTube Shorts, TikTok, Instagram Reels and Facebook.
 
 1. **Clip** — cut any moment out of a recording (`--start` / `--end`).
 2. **Auto-caption** — transcribes the audio with Whisper (free, offline) and
-   burns small bold captions into the bottom of the video (Verdana by
+   burns small bold captions into the bottom-centre of the video (Verdana by
    default; change it with `--font`, e.g. Arial, Impact).
 3. **Resize** — exports vertical 9:16 (1080x1920) by default, so it fits
    Shorts / TikTok / Reels without black bars. Two ways to fill the frame:
@@ -56,8 +56,10 @@ Paste a YouTube link, or drag a video file onto the window (or use
 Browse). Pick the start / end (1 minute by default), platform, blur or
 crop, and hit "Make clip". You can also pick a background music file (with a volume
 slider), choose the caption font, or tick "Auto-pick best moments" and let it find the loudest
-moments for you. While a clip is being made, a spinner and progress bar
-show it working. Drag & drop needs one extra package:
+moments for you. While a clip is being made, a little robot edits it for
+you — bobbing, blinking and snipping the film strip — next to a progress
+bar. The File menu (Ctrl+O to open a video) and the status bar at the
+bottom make it feel like a proper app. Drag & drop needs one extra package:
 
 ```bash
 pip install tkinterdnd2
@@ -113,8 +115,8 @@ python clip.py gameplay.mp4 --highlights 3 --highlight-length 10 --music my_trac
 | `--highlight-length` | Length of each auto highlight in seconds (default 60) |
 | `--font` | Caption font, e.g. Verdana, Arial, Impact (default Verdana) |
 
-Captions are small white bold text with a black outline, at the bottom
-of the frame — the usual short-form look. The `.srt` file is kept in a temp folder; if you want
+Captions are small white bold text with a black outline, centred at the
+bottom of the frame — the usual short-form look. The `.srt` file is kept in a temp folder; if you want
 to edit captions by hand, run with `--model` once, grab the SRT, edit it,
 and a future `--srt` option will burn your edited version in.
 
