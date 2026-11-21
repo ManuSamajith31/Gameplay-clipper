@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+downloads/
+outputs/
+*.mp4
+*.mov
+*.mkv
+!samples/

@@ -1,0 +1,8 @@
+# faster-whisper: free offline speech-to-text for auto-captions.
+# Uses CTranslate2, so it's much lighter than openai-whisper (no big torch install).
+# (clip.py feeds Whisper raw PCM arrays, so it doesn't depend on the PyAV
+# file-decoding path that broke in newer av releases.)
+faster-whisper>=1.0.0
+
+# yt-dlp: download your own YouTube uploads as a clip source (optional).
+yt-dlp>=2024.1.1
