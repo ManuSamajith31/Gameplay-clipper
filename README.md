@@ -14,6 +14,13 @@ to YouTube Shorts, TikTok, Instagram Reels and Facebook.
      filling the sides — best when the HUD matters.
    - `crop`: fills the frame edge to edge, sides cut off — best for
      close-up moments.
+4. **Background music** — mix any track you pick (`--music`) quietly under
+   the game audio. The tool can't fetch trending songs for you — they are
+   copyrighted and change daily — so bring your own file: a track you own,
+   or royalty-free music (e.g. YouTube Audio Library).
+5. **Best moments** — `--highlights 3` skips picking times by hand: it
+   finds the loudest moments in the video (gunfights, explosions,
+   reactions) and exports the top 3 as separate clips.
 
 Input can be a local recording, or a YouTube URL — use your own uploads
 (or videos you have the rights to), not other people's content.
@@ -46,7 +53,9 @@ python gui.py
 
 Paste a YouTube link, or drag a video file onto the window (or use
 Browse). Pick the start / end, platform, blur or crop, and hit
-"Make clip". Drag & drop needs one extra package:
+"Make clip". You can also pick a background music file (with a volume
+slider), or tick "Auto-pick best moments" and let it find the loudest
+moments for you. Drag & drop needs one extra package:
 
 ```bash
 pip install tkinterdnd2
@@ -75,6 +84,16 @@ python clip.py gameplay.mp4 --start 10 --end 40 --format 16:9 --out clip.mp4
 
 # Your own YouTube gameplay video as the source
 python clip.py "https://www.youtube.com/watch?v=XXXX" --start 60 --end 90 --out clip.mp4
+
+# Mix background music under the game audio (music at 20% volume)
+python clip.py gameplay.mp4 --start 60 --end 90 --music my_track.mp3 --music-volume 0.2 --out clip.mp4
+
+# Auto-pick the 3 best moments, 15 seconds each, no times needed
+python clip.py gameplay.mp4 --highlights 3 --out best.mp4
+# -> best_1.mp4, best_2.mp4, best_3.mp4
+
+# Best moments, shorter, with music
+python clip.py gameplay.mp4 --highlights 3 --highlight-length 10 --music my_track.mp3 --out best.mp4
 ```
 
 | Flag | What it does |
@@ -86,6 +105,10 @@ python clip.py "https://www.youtube.com/watch?v=XXXX" --start 60 --end 90 --out 
 | `--mode` | `blur` (default) or `crop` |
 | `--no-captions` | Skip auto-captions |
 | `--model` | Whisper model: `tiny` (fast, default), `base`, `small` (better, slower) |
+| `--music` | Background music file (mp3/wav), mixed under the game audio |
+| `--music-volume` | Music volume 0.0–1.0 (default 0.15) |
+| `--highlights` | Auto-pick this many best moments instead of `--start`/`--end` |
+| `--highlight-length` | Length of each auto highlight in seconds (default 15) |
 
 Captions are white bold text with a black outline, bottom-centre — the
 usual short-form look. The `.srt` file is kept in a temp folder; if you want
@@ -101,8 +124,10 @@ First run downloads the model (~75 MB for tiny), then it's cached.
 
 ## Roadmap
 
-- [ ] Auto-highlight detection — find the loudest / most exciting moments
-      automatically instead of picking start/end by hand
+- [x] Auto-highlight detection — finds the loudest / most exciting moments
+      automatically instead of picking start/end by hand (`--highlights`)
+- [x] Background music — mix a track of your choice under the game audio
+      (`--music`)
 - [ ] `--srt` flag — burn in your own hand-edited captions
 - [ ] Web UI — drag a video in, drag the trim handles, download the clip
 - [ ] Batch mode — cut several moments from one recording in one run
